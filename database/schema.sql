@@ -1,0 +1,63 @@
+CREATE TABLE IF NOT EXISTS users (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(120) NOT NULL,
+  email VARCHAR(160) NOT NULL UNIQUE,
+  password VARCHAR(255) NOT NULL,
+  is_admin BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS products (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  title VARCHAR(255) NOT NULL,
+  slug VARCHAR(255) NOT NULL UNIQUE,
+  description TEXT NOT NULL,
+  price DECIMAL(10, 2) NOT NULL,
+  discount INT DEFAULT 0,
+  stock INT DEFAULT 0,
+  category VARCHAR(120) DEFAULT 'Trending Summer Products',
+  image_urls JSON,
+  video_url VARCHAR(255),
+  specifications JSON,
+  featured BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT NULL,
+  customer_name VARCHAR(120) NOT NULL,
+  email VARCHAR(160) NOT NULL,
+  phone VARCHAR(20) NOT NULL,
+  address TEXT NOT NULL,
+  total_price DECIMAL(10, 2) NOT NULL,
+  status ENUM('Pending', 'Shipped', 'Delivered') DEFAULT 'Pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  order_id INT NOT NULL,
+  product_id INT NOT NULL,
+  quantity INT NOT NULL,
+  price DECIMAL(10, 2) NOT NULL,
+  CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+  CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS coupons (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  code VARCHAR(60) NOT NULL UNIQUE,
+  discount INT NOT NULL,
+  active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS announcements (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  text VARCHAR(255) NOT NULL,
+  active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+

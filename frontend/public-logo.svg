@@ -1,0 +1,13 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="512" cy="512" r="468" fill="#17104A"/>
+  <path d="M484 317C484 262.324 528.324 218 583 218H606C641.346 218 669.07 248.329 665.911 283.533L644 528H603L626.1 270.313C626.739 263.193 621.136 257 613.988 257H583C549.863 257 523 283.863 523 317V345H484V317Z" fill="#FF9B16"/>
+  <path d="M404 334H657L622 609H380L404 334Z" fill="#FF9B16"/>
+  <path d="M428 361H627L601 583H407L428 361Z" fill="#17104A"/>
+  <path d="M452 385H598L585 462C553 494 497 525 429 545L452 385Z" fill="#F7D51D"/>
+  <path d="M430 551C493 535 550 503 586 468L573 556L430 551Z" fill="#F7D51D"/>
+  <path d="M639 337H683V609H626L639 337Z" fill="#FF9B16"/>
+  <path d="M419 303L432.652 344.348L474 358L432.652 371.652L419 413L405.348 371.652L364 358L405.348 344.348L419 303Z" fill="#F7D51D"/>
+  <path d="M463 235L471.034 259.966L496 268L471.034 276.034L463 301L454.966 276.034L430 268L454.966 259.966L463 235Z" fill="#F7D51D"/>
+  <text x="512" y="690" text-anchor="middle" fill="#F7D51D" font-family="Verdana, Geneva, sans-serif" font-size="72" font-weight="800" letter-spacing="7">BHARATMART.LIVE</text>
+  <text x="512" y="742" text-anchor="middle" fill="#FF9B16" font-family="Verdana, Geneva, sans-serif" font-size="36" font-weight="700" letter-spacing="15">TRUSTED DEALS</text>
+</svg>
