@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # BharatMart.live
 
 Production-minded full-stack ecommerce starter for `bharatmart.live` with:
@@ -64,3 +65,7 @@ Use the MySQL credentials you shared inside `backend/.env`.
 
 - Media uploads are stored in `backend/uploads` and exposed via `/uploads/...`.
 - The logo asset is recreated as an SVG inspired by your provided branding so it can scale cleanly across the site.
+=======
+# bharatmart
+None
+>>>>>>> 986813a12ea37ff9bd0882d311e069c5acc0d620

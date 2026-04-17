@@ -9,7 +9,7 @@
   "scripts": {
     "install:all": "npm.cmd install --workspaces",
     "dev": "concurrently \"npm.cmd run dev --workspace frontend\" \"npm.cmd run dev --workspace backend\"",
-    "build": "npm.cmd run build --workspace frontend",
+    "build": "npm run build --workspace frontend",
     "start": "npm.cmd run start --workspace backend"
   },
   "devDependencies": {
