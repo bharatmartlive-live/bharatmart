@@ -7,5 +7,16 @@ export const pool = mysql.createPool({
   password: env.mysqlPassword,
   database: env.mysqlDb,
   waitForConnections: true,
-  connectionLimit: 10
+  connectionLimit: 10,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0
 });
+
+export async function warmDatabase() {
+  try {
+    await pool.query('SELECT 1');
+    console.log('MySQL connection warmed.');
+  } catch (error) {
+    console.error('MySQL warm-up failed:', error.message);
+  }
+}

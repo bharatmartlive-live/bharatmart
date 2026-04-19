@@ -9,5 +9,7 @@ export const env = {
   mysqlHost: process.env.MYSQL_HOST,
   mysqlUser: process.env.MYSQL_USER,
   mysqlPassword: process.env.MYSQL_PASSWORD,
-  mysqlDb: process.env.MYSQL_DB
+  mysqlDb: process.env.MYSQL_DB,
+  keepAliveUrl: process.env.KEEP_ALIVE_URL || '',
+  enableKeepAlive: process.env.ENABLE_KEEP_ALIVE === 'true'
 };

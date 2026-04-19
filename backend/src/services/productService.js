@@ -1,6 +1,12 @@
 import slugify from 'slugify';
 import { pool } from '../config/db.js';
 
+const PRODUCT_CACHE_TTL = 1000 * 60 * 5;
+const productCache = {
+  rows: null,
+  expiresAt: 0
+};
+
 const safeJsonParse = (value, fallback = []) => {
   if (!value) return fallback;
   if (Array.isArray(value)) return value;
@@ -11,12 +17,38 @@ const safeJsonParse = (value, fallback = []) => {
   }
 };
 
-export async function getAllProducts() {
+export function clearProductCache() {
+  productCache.rows = null;
+  productCache.expiresAt = 0;
+}
+
+export async function warmProductCache() {
+  try {
+    await getAllProducts({ forceRefresh: true });
+    console.log('Product cache warmed.');
+  } catch (error) {
+    console.error('Product cache warm-up failed:', error.message);
+  }
+}
+
+export async function getAllProducts(options = {}) {
+  const now = Date.now();
+
+  if (!options.forceRefresh && productCache.rows && productCache.expiresAt > now) {
+    return productCache.rows;
+  }
+
   const [rows] = await pool.query('SELECT * FROM products ORDER BY created_at DESC');
+  productCache.rows = rows;
+  productCache.expiresAt = now + PRODUCT_CACHE_TTL;
   return rows;
 }
 
 export async function getProductById(id) {
+  const cachedProducts = await getAllProducts();
+  const cachedProduct = cachedProducts.find((product) => String(product.id) === String(id));
+  if (cachedProduct) return cachedProduct;
+
   const [rows] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
   return rows[0];
 }
@@ -56,6 +88,7 @@ export async function createProduct(payload) {
     ]
   );
 
+  clearProductCache();
   return getProductById(result.insertId);
 }
 
@@ -98,9 +131,11 @@ export async function updateProduct(id, payload) {
     ]
   );
 
+  clearProductCache();
   return getProductById(id);
 }
 
 export async function deleteProduct(id) {
   await pool.query('DELETE FROM products WHERE id = ?', [id]);
+  clearProductCache();
 }
