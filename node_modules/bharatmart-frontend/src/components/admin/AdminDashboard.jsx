@@ -1,3 +1,4 @@
+ï»¿import { MessageCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { parseSpecificationText, stringifySpecifications } from '../../lib/specifications';
@@ -33,6 +34,32 @@ const toProductPayload = (form) => ({
     .map((item) => ({ label: item.label.trim(), value: item.value.trim() }))
     .filter((item) => item.label && item.value)
 });
+
+const parseJsonField = (value, fallback = []) => {
+  if (!value) return fallback;
+  if (Array.isArray(value)) return value;
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch (error) {
+    return fallback;
+  }
+};
+
+const normalizePhoneForWhatsapp = (phone = '') => {
+  const digits = String(phone).replace(/\D/g, '');
+  if (digits.length === 10) return `91${digits}`;
+  return digits;
+};
+
+const getOrderWhatsappUrl = (order) => {
+  const phone = normalizePhoneForWhatsapp(order.phone);
+  if (!phone) return '#';
+
+  const message = `Hello ${order.customer_name}, thanks for ordering with BharatMart.live. Your order #${order.id} has been received and you will receive your product in 3-7 days. For more information contact us on +918826333790.`;
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+};
 
 export function AdminDashboard() {
   const [token, setToken] = useState(localStorage.getItem('bharatmart-admin-token') || '');
@@ -84,19 +111,25 @@ export function AdminDashboard() {
 
   const handleProductSubmit = async (event) => {
     event.preventDefault();
-    const payload = toProductPayload(productForm);
+    setMessage(editingProductId ? 'Updating product, please wait...' : 'Saving product, please wait...');
 
-    if (editingProductId) {
-      await api.put(`/admin/products/${editingProductId}`, payload, { headers: authHeaders });
-      setMessage('Product updated.');
-    } else {
-      await api.post('/admin/products', payload, { headers: authHeaders });
-      setMessage('Product created.');
+    try {
+      const payload = toProductPayload(productForm);
+
+      if (editingProductId) {
+        await api.put(`/admin/products/${editingProductId}`, payload, { headers: authHeaders });
+        setMessage('Product updated successfully.');
+      } else {
+        await api.post('/admin/products', payload, { headers: authHeaders });
+        setMessage('Product created successfully.');
+      }
+
+      setProductForm(initialProduct);
+      setEditingProductId(null);
+      loadDashboard();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to save product right now. Please check the fields and try again.');
     }
-
-    setProductForm(initialProduct);
-    setEditingProductId(null);
-    loadDashboard();
   };
 
   const handleAnnouncementSubmit = async (event) => {
@@ -126,8 +159,11 @@ export function AdminDashboard() {
   };
 
   const editProduct = (product) => {
+    const specifications = parseJsonField(product.specifications, []);
+
     setEditingProductId(product.id);
     setProductForm({
+      ...initialProduct,
       title: product.title,
       description: product.description,
       price: product.price,
@@ -135,9 +171,13 @@ export function AdminDashboard() {
       stock: product.stock,
       category: product.category,
       featured: Boolean(product.featured),
-      imageUrlsText: JSON.parse(product.image_urls || '[]').join(', '),
-      videoUrl: product.video_url || ''
+      imageUrlsText: parseJsonField(product.image_urls, []).join(', '),
+      videoUrl: product.video_url || '',
+      specifications,
+      specificationsText: stringifySpecifications(specifications)
     });
+    setMessage(`Editing "${product.title}". Update the fields and click Update Product.`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const updateSpecificationRow = (index, field, value) => {
@@ -162,6 +202,7 @@ export function AdminDashboard() {
       specifications: current.specifications.filter((row, rowIndex) => rowIndex !== index)
     }));
   };
+
   const deleteProduct = async (productId) => {
     await api.delete(`/products/${productId}`, { headers: authHeaders });
     setMessage('Product deleted.');
@@ -206,15 +247,12 @@ export function AdminDashboard() {
             placeholder="Password"
             className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-brand"
             value={loginForm.password}
-            onChange={(event) =>
-              setLoginForm((current) => ({ ...current, password: event.target.value }))
-            }
+            onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
           />
           <button disabled={loginLoading} className="w-full rounded-full bg-ink px-5 py-3 font-semibold text-white transition hover:bg-brand hover:text-navy disabled:opacity-60">
             {loginLoading ? 'Please wait...' : 'Login'}
           </button>
           {loginStatus ? <p className="rounded-2xl bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-700">{loginStatus}</p> : null}
-
         </form>
       </div>
     );
@@ -451,7 +489,7 @@ export function AdminDashboard() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="font-semibold text-ink">{product.title}</p>
-                    <p className="text-sm text-slate-500">Rs {product.price} • {product.stock} in stock</p>
+                    <p className="text-sm text-slate-500">Rs {product.price} - {product.stock} in stock</p>
                   </div>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => editProduct(product)} className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold">
@@ -473,9 +511,18 @@ export function AdminDashboard() {
             {dashboard.orders.map((order) => (
               <div key={order.id} className="rounded-2xl bg-slate-50 p-4">
                 <p className="font-semibold text-ink">Order #{order.id}</p>
-                <p className="text-sm text-slate-600">{order.customer_name} • {order.phone}</p>
+                <p className="text-sm text-slate-600">{order.customer_name} - {order.phone}</p>
                 <p className="mt-1 text-sm text-slate-500">{order.address}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
+                  <a
+                    href={getOrderWhatsappUrl(order)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-600"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    WhatsApp Update
+                  </a>
                   {['Pending', 'Shipped', 'Delivered'].map((status) => (
                     <button
                       key={status}
@@ -499,10 +546,3 @@ export function AdminDashboard() {
     </div>
   );
 }
-
-
-
-
-
-
-
