@@ -1,5 +1,6 @@
 import { pool } from '../config/db.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { getAnalyticsSummary } from '../services/analyticsService.js';
 import { createProduct, updateProduct } from '../services/productService.js';
 
 export const storefrontData = asyncHandler(async (req, res) => {
@@ -19,17 +20,21 @@ export const storefrontData = asyncHandler(async (req, res) => {
 });
 
 export const dashboardData = asyncHandler(async (req, res) => {
-  const [products] = await pool.query('SELECT * FROM products ORDER BY created_at DESC');
-  const [orders] = await pool.query('SELECT * FROM orders ORDER BY created_at DESC');
-  const [announcements] = await pool.query('SELECT * FROM announcements ORDER BY created_at DESC');
-  const [coupons] = await pool.query('SELECT * FROM coupons ORDER BY created_at DESC');
+  const [[products], [orders], [announcements], [coupons], analytics] = await Promise.all([
+    pool.query('SELECT * FROM products ORDER BY created_at DESC'),
+    pool.query('SELECT * FROM orders ORDER BY created_at DESC'),
+    pool.query('SELECT * FROM announcements ORDER BY created_at DESC'),
+    pool.query('SELECT * FROM coupons ORDER BY created_at DESC'),
+    getAnalyticsSummary()
+  ]);
 
   res.json({
     data: {
       products,
       orders,
       announcements,
-      coupons
+      coupons,
+      analytics
     }
   });
 });

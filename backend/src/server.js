@@ -1,6 +1,7 @@
 import { app } from './app.js';
 import { env } from './config/env.js';
 import { warmDatabase } from './config/db.js';
+import { ensureAnalyticsTable } from './services/analyticsService.js';
 import { warmProductCache } from './services/productService.js';
 
 function startKeepAlive() {
@@ -21,6 +22,7 @@ function startKeepAlive() {
 app.listen(env.port, () => {
   console.log(`BharatMart API running on port ${env.port}`);
   warmDatabase();
+  ensureAnalyticsTable().catch(() => {});
   warmProductCache();
   startKeepAlive();
 });

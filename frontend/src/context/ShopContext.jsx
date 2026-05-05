@@ -1,5 +1,6 @@
 import { createContext, useEffect, useMemo, useState } from 'react';
 import { api, withMediaUrl } from '../lib/api';
+import { trackAnalyticsEvent } from '../lib/analytics';
 import {
   fallbackAnnouncements,
   fallbackCoupons,
@@ -105,6 +106,11 @@ export function ShopProvider({ children }) {
         id: `${productId}-${Date.now()}`,
         title: product.title,
         image: product.imageUrls?.[0]
+      });
+
+      trackAnalyticsEvent({
+        eventType: 'add_to_cart',
+        productId: product.id
       });
     }
 

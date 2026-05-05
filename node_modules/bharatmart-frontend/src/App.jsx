@@ -6,6 +6,7 @@ import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { ScrollToTop } from './components/layout/ScrollToTop';
 import { CartFeedback } from './components/layout/CartFeedback';
+import { RouteAnalyticsTracker } from './components/layout/RouteAnalyticsTracker';
 import { Chatbot, PurchaseToast } from './components/layout/EngagementWidgets';
 import { HomePage } from './pages/HomePage';
 import { HotDealsPage } from './pages/HotDealsPage';
@@ -29,6 +30,7 @@ function AppShell() {
   return (
     <div className="min-h-screen bg-slate-50 text-ink">
       <ScrollToTop />
+      <RouteAnalyticsTracker />
       {!hideAnnouncementBar ? <AnnouncementBar items={announcements} /> : null}
       <Header />
       <main>
