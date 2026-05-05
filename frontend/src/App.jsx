@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { ShopProvider } from './context/ShopContext';
 import { useShop } from './hooks/useShop';
 import { AnnouncementBar } from './components/layout/AnnouncementBar';
@@ -23,11 +23,13 @@ import { NotFoundPage } from './pages/NotFoundPage';
 
 function AppShell() {
   const { announcements } = useShop();
+  const location = useLocation();
+  const hideAnnouncementBar = ['/cart', '/checkout'].includes(location.pathname);
 
   return (
     <div className="min-h-screen bg-slate-50 text-ink">
       <ScrollToTop />
-      <AnnouncementBar items={announcements} />
+      {!hideAnnouncementBar ? <AnnouncementBar items={announcements} /> : null}
       <Header />
       <main>
         <Routes>
@@ -37,7 +39,8 @@ function AppShell() {
           <Route path="/cart" element={<CartPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin" element={<AdminPage initialView="catalog" />} />
+          <Route path="/admin/sales" element={<AdminPage initialView="sales" />} />
           <Route path="/faq" element={<FAQPage />} />
           <Route path="/testimonials" element={<TestimonialsPage />} />
           <Route path="/about" element={<AboutPage />} />

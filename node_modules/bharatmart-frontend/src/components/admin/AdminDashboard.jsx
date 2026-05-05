@@ -1,5 +1,7 @@
-﻿import { MessageCircle } from 'lucide-react';
-import { useEffect, useState } from 'react';
+﻿import { Download, MessageCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import { api } from '../../lib/api';
 import { parseSpecificationText, stringifySpecifications } from '../../lib/specifications';
 
@@ -53,16 +55,47 @@ const normalizePhoneForWhatsapp = (phone = '') => {
   return digits;
 };
 
+const extractOrderField = (address = '', label) => {
+  const line = String(address)
+    .split('\n')
+    .find((item) => item.toLowerCase().startsWith(`${label.toLowerCase()}:`));
+  return line ? line.replace(new RegExp(`^${label}:\\s*`, 'i'), '') : '';
+};
+
 const getOrderWhatsappUrl = (order) => {
   const phone = normalizePhoneForWhatsapp(order.phone);
   if (!phone) return '#';
 
-  const message = `Hello ${order.customer_name}, thanks for ordering with BharatMart.live. Your order #${order.id} has been received and you will receive your product in 3-7 days. For more information contact us on +918826333790.`;
+  const message = `Hello ${order.customer_name}, thanks for ordering with BharatMart.live. Your order #${order.id} has been received. You will receive your product in 3-7 days. We have also included a hidden gift inside your package. For more information contact us on +918826333790.`;
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 };
 
-export function AdminDashboard() {
+const exportOrdersToExcel = (orders) => {
+  const rows = orders.map((order) => ({
+    'Order ID': order.id,
+    'Customer Name': order.customer_name,
+    Email: order.email,
+    Phone: order.phone,
+    Status: order.status,
+    'Payment Method': extractOrderField(order.address, 'Payment') || 'COD',
+    'Coupon Used': extractOrderField(order.address, 'Coupon') || 'No coupon',
+    'Billing Address': extractOrderField(order.address, 'Billing') || order.address,
+    'Shipping Address': extractOrderField(order.address, 'Shipping') || extractOrderField(order.address, 'Billing') || order.address,
+    Note: extractOrderField(order.address, 'Note') || 'No note',
+    'Total Price': Number(order.total_price || 0),
+    'Created At': order.created_at
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Sales');
+  XLSX.writeFile(workbook, `bharatmart-sales-${new Date().toISOString().slice(0, 10)}.xlsx`);
+};
+
+export function AdminDashboard({ initialView = 'catalog' }) {
+  const navigate = useNavigate();
   const [token, setToken] = useState(localStorage.getItem('bharatmart-admin-token') || '');
+  const [activeView, setActiveView] = useState(initialView);
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [productForm, setProductForm] = useState(initialProduct);
   const [editingProductId, setEditingProductId] = useState(null);
@@ -80,9 +113,12 @@ export function AdminDashboard() {
 
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
+  useEffect(() => {
+    setActiveView(initialView);
+  }, [initialView]);
+
   const loadDashboard = async () => {
     if (!token) return;
-
     const { data } = await api.get('/admin/dashboard', { headers: authHeaders });
     setDashboard(data.data);
   };
@@ -90,6 +126,22 @@ export function AdminDashboard() {
   useEffect(() => {
     loadDashboard().catch(() => {});
   }, [token]);
+
+  const orderMetrics = useMemo(() => {
+    const totalRevenue = dashboard.orders.reduce((sum, order) => sum + Number(order.total_price || 0), 0);
+    return {
+      totalRevenue,
+      totalOrders: dashboard.orders.length,
+      pending: dashboard.orders.filter((order) => order.status === 'Pending').length,
+      shipped: dashboard.orders.filter((order) => order.status === 'Shipped').length,
+      delivered: dashboard.orders.filter((order) => order.status === 'Delivered').length
+    };
+  }, [dashboard.orders]);
+
+  const switchView = (view) => {
+    setActiveView(view);
+    navigate(view === 'sales' ? '/admin/sales' : '/admin');
+  };
 
   const handleLogin = async (event) => {
     event.preventDefault();
@@ -134,11 +186,7 @@ export function AdminDashboard() {
 
   const handleAnnouncementSubmit = async (event) => {
     event.preventDefault();
-    await api.post(
-      '/admin/announcements',
-      { text: announcementText, active: true },
-      { headers: authHeaders }
-    );
+    await api.post('/admin/announcements', { text: announcementText, active: true }, { headers: authHeaders });
     setAnnouncementText('');
     setMessage('Announcement created.');
     loadDashboard();
@@ -220,11 +268,7 @@ export function AdminDashboard() {
   };
 
   const toggleAnnouncement = async (announcement) => {
-    await api.patch(
-      `/admin/announcements/${announcement.id}`,
-      { active: !announcement.active },
-      { headers: authHeaders }
-    );
+    await api.patch(`/admin/announcements/${announcement.id}`, { active: !announcement.active }, { headers: authHeaders });
     setMessage('Announcement status updated.');
     loadDashboard();
   };
@@ -258,26 +302,118 @@ export function AdminDashboard() {
     );
   }
 
+  if (activeView === 'sales') {
+    return (
+      <div className="space-y-8">
+        <div className="rounded-[28px] bg-white p-6 shadow-soft">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-3xl font-black text-ink">Sales Dashboard</h1>
+              <p className="mt-2 text-sm text-slate-600">View all customer orders, addresses, coupons, and download the full sheet.</p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <button type="button" onClick={() => switchView('catalog')} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">
+                Back to Catalog
+              </button>
+              <button type="button" onClick={() => exportOrdersToExcel(dashboard.orders)} className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600">
+                <Download className="h-4 w-4" /> Download Excel
+              </button>
+            </div>
+          </div>
+          {message ? <p className="mt-4 text-sm font-medium text-accent">{message}</p> : null}
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-4 xl:grid-cols-5">
+          <div className="rounded-[24px] bg-white p-5 shadow-soft"><p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Total Orders</p><p className="mt-2 text-3xl font-black text-ink">{orderMetrics.totalOrders}</p></div>
+          <div className="rounded-[24px] bg-white p-5 shadow-soft"><p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Pending</p><p className="mt-2 text-3xl font-black text-orange-600">{orderMetrics.pending}</p></div>
+          <div className="rounded-[24px] bg-white p-5 shadow-soft"><p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Shipped</p><p className="mt-2 text-3xl font-black text-blue-600">{orderMetrics.shipped}</p></div>
+          <div className="rounded-[24px] bg-white p-5 shadow-soft"><p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Delivered</p><p className="mt-2 text-3xl font-black text-emerald-600">{orderMetrics.delivered}</p></div>
+          <div className="rounded-[24px] bg-white p-5 shadow-soft"><p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Revenue</p><p className="mt-2 text-2xl font-black text-ink">Rs {Math.round(orderMetrics.totalRevenue)}</p></div>
+        </div>
+
+        <section className="rounded-[28px] bg-white p-6 shadow-soft">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                  <th className="px-3 py-3">Order</th>
+                  <th className="px-3 py-3">Customer</th>
+                  <th className="px-3 py-3">Addresses</th>
+                  <th className="px-3 py-3">Coupon</th>
+                  <th className="px-3 py-3">Total</th>
+                  <th className="px-3 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dashboard.orders.map((order) => (
+                  <tr key={order.id} className="border-b border-slate-100 align-top">
+                    <td className="px-3 py-4">
+                      <p className="font-black text-ink">#{order.id}</p>
+                      <p className="text-xs text-slate-500">{order.status}</p>
+                    </td>
+                    <td className="px-3 py-4">
+                      <p className="font-semibold text-ink">{order.customer_name}</p>
+                      <p className="text-slate-500">{order.phone}</p>
+                      <p className="text-slate-500">{order.email}</p>
+                    </td>
+                    <td className="px-3 py-4 text-slate-600">
+                      <p><span className="font-semibold text-ink">Billing:</span> {extractOrderField(order.address, 'Billing') || order.address}</p>
+                      <p className="mt-2"><span className="font-semibold text-ink">Shipping:</span> {extractOrderField(order.address, 'Shipping') || extractOrderField(order.address, 'Billing') || order.address}</p>
+                    </td>
+                    <td className="px-3 py-4 text-slate-600">{extractOrderField(order.address, 'Coupon') || 'No coupon'}</td>
+                    <td className="px-3 py-4 font-black text-ink">Rs {Math.round(Number(order.total_price || 0))}</td>
+                    <td className="px-3 py-4">
+                      <div className="flex flex-col gap-2">
+                        <a href={getOrderWhatsappUrl(order)} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-500 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600">
+                          <MessageCircle className="h-3.5 w-3.5" /> WhatsApp Update
+                        </a>
+                        <div className="flex flex-wrap gap-2">
+                          {['Pending', 'Shipped', 'Delivered'].map((status) => (
+                            <button
+                              key={status}
+                              type="button"
+                              onClick={() => updateOrderStatus(order.id, status)}
+                              className={`rounded-full px-3 py-1.5 text-xs font-semibold ${order.status === status ? 'bg-brand text-navy' : 'border border-slate-200 bg-white text-slate-600'}`}
+                            >
+                              {status}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div className="rounded-[28px] bg-white p-6 shadow-soft">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-black text-ink">Admin Dashboard</h1>
-            <p className="mt-2 text-sm text-slate-600">
-              Manage products, announcements, coupons, media, and incoming orders.
-            </p>
+            <p className="mt-2 text-sm text-slate-600">Manage products, announcements, coupons, media, and incoming orders.</p>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              localStorage.removeItem('bharatmart-admin-token');
-              setToken('');
-            }}
-            className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold"
-          >
-            Logout
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" onClick={() => switchView('sales')} className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white">
+              See Sales
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.removeItem('bharatmart-admin-token');
+                setToken('');
+              }}
+              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold"
+            >
+              Logout
+            </button>
+          </div>
         </div>
         {message ? <p className="mt-4 text-sm font-medium text-accent">{message}</p> : null}
       </div>
@@ -287,158 +423,64 @@ export function AdminDashboard() {
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-xl font-black text-ink">{editingProductId ? 'Edit Product' : 'Add Product'}</h2>
             {editingProductId ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingProductId(null);
-                  setProductForm(initialProduct);
-                }}
-                className="text-sm font-semibold text-slate-500"
-              >
+              <button type="button" onClick={() => { setEditingProductId(null); setProductForm(initialProduct); }} className="text-sm font-semibold text-slate-500">
                 Cancel edit
               </button>
             ) : null}
           </div>
           <div className="mt-4 grid gap-4">
-            <input
-              placeholder="Product title"
-              className="rounded-2xl border border-slate-200 px-4 py-3"
-              value={productForm.title}
-              onChange={(event) => setProductForm((current) => ({ ...current, title: event.target.value }))}
-            />
-            <textarea
-              placeholder="Description"
-              className="min-h-28 rounded-2xl border border-slate-200 px-4 py-3"
-              value={productForm.description}
-              onChange={(event) =>
-                setProductForm((current) => ({ ...current, description: event.target.value }))
-              }
-            />
+            <input placeholder="Product title" className="rounded-2xl border border-slate-200 px-4 py-3" value={productForm.title} onChange={(event) => setProductForm((current) => ({ ...current, title: event.target.value }))} />
+            <textarea placeholder="Description" className="min-h-28 rounded-2xl border border-slate-200 px-4 py-3" value={productForm.description} onChange={(event) => setProductForm((current) => ({ ...current, description: event.target.value }))} />
             <div className="grid gap-4 md:grid-cols-2">
-              <input
-                placeholder="Price"
-                type="number"
-                className="rounded-2xl border border-slate-200 px-4 py-3"
-                value={productForm.price}
-                onChange={(event) => setProductForm((current) => ({ ...current, price: event.target.value }))}
-              />
-              <input
-                placeholder="Discount %"
-                type="number"
-                className="rounded-2xl border border-slate-200 px-4 py-3"
-                value={productForm.discount}
-                onChange={(event) =>
-                  setProductForm((current) => ({ ...current, discount: event.target.value }))
-                }
-              />
+              <input placeholder="Price" type="number" className="rounded-2xl border border-slate-200 px-4 py-3" value={productForm.price} onChange={(event) => setProductForm((current) => ({ ...current, price: event.target.value }))} />
+              <input placeholder="Discount %" type="number" className="rounded-2xl border border-slate-200 px-4 py-3" value={productForm.discount} onChange={(event) => setProductForm((current) => ({ ...current, discount: event.target.value }))} />
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <input
-                placeholder="Stock"
-                type="number"
-                className="rounded-2xl border border-slate-200 px-4 py-3"
-                value={productForm.stock}
-                onChange={(event) => setProductForm((current) => ({ ...current, stock: event.target.value }))}
-              />
-              <select
-                className="rounded-2xl border border-slate-200 px-4 py-3"
-                value={productForm.category}
-                onChange={(event) =>
-                  setProductForm((current) => ({ ...current, category: event.target.value }))
-                }
-              >
+              <input placeholder="Stock" type="number" className="rounded-2xl border border-slate-200 px-4 py-3" value={productForm.stock} onChange={(event) => setProductForm((current) => ({ ...current, stock: event.target.value }))} />
+              <select className="rounded-2xl border border-slate-200 px-4 py-3" value={productForm.category} onChange={(event) => setProductForm((current) => ({ ...current, category: event.target.value }))}>
                 <option>Trending Summer Products</option>
                 <option>Hot Deals</option>
                 <option>Recommended for You</option>
               </select>
             </div>
-            <textarea
-              placeholder="Image URLs separated by commas"
-              className="min-h-24 rounded-2xl border border-slate-200 px-4 py-3"
-              value={productForm.imageUrlsText}
-              onChange={(event) =>
-                setProductForm((current) => ({ ...current, imageUrlsText: event.target.value }))
-              }
-            />
-            <input
-              placeholder="Video URL"
-              className="rounded-2xl border border-slate-200 px-4 py-3"
-              value={productForm.videoUrl}
-              onChange={(event) => setProductForm((current) => ({ ...current, videoUrl: event.target.value }))}
-            />
+            <textarea placeholder="Image URLs separated by commas" className="min-h-24 rounded-2xl border border-slate-200 px-4 py-3" value={productForm.imageUrlsText} onChange={(event) => setProductForm((current) => ({ ...current, imageUrlsText: event.target.value }))} />
+            <input placeholder="Video URL" className="rounded-2xl border border-slate-200 px-4 py-3" value={productForm.videoUrl} onChange={(event) => setProductForm((current) => ({ ...current, videoUrl: event.target.value }))} />
 
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="font-black text-ink">Product Specification Table</h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Paste rows like "Cooler Type: Desert" or paste two-column table data from Excel/Sheets.
-                  </p>
+                  <p className="mt-1 text-xs text-slate-500">Paste rows like "Cooler Type: Desert" or paste two-column table data from Excel/Sheets.</p>
                 </div>
-                <button type="button" onClick={addSpecificationRow} className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm">
-                  Add row
-                </button>
+                <button type="button" onClick={addSpecificationRow} className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm">Add row</button>
               </div>
-
               <div className="mt-4 space-y-3">
                 {productForm.specifications.map((row, index) => (
                   <div key={index} className="grid gap-3 md:grid-cols-[1fr,1fr,auto]">
-                    <input
-                      placeholder="Column / label"
-                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
-                      value={row.label}
-                      onChange={(event) => updateSpecificationRow(index, 'label', event.target.value)}
-                    />
-                    <input
-                      placeholder="Value"
-                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
-                      value={row.value}
-                      onChange={(event) => updateSpecificationRow(index, 'value', event.target.value)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeSpecificationRow(index)}
-                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-red-500"
-                    >
-                      Remove
-                    </button>
+                    <input placeholder="Column / label" className="rounded-2xl border border-slate-200 bg-white px-4 py-3" value={row.label} onChange={(event) => updateSpecificationRow(index, 'label', event.target.value)} />
+                    <input placeholder="Value" className="rounded-2xl border border-slate-200 bg-white px-4 py-3" value={row.value} onChange={(event) => updateSpecificationRow(index, 'value', event.target.value)} />
+                    <button type="button" onClick={() => removeSpecificationRow(index)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-red-500">Remove</button>
                   </div>
                 ))}
               </div>
-
-              <textarea
-                placeholder="Paste specification table here"
-                className="mt-4 min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3"
-                value={productForm.specificationsText}
-                onChange={(event) => setProductForm((current) => ({ ...current, specificationsText: event.target.value }))}
-              />
+              <textarea placeholder="Paste specification table here" className="mt-4 min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" value={productForm.specificationsText} onChange={(event) => setProductForm((current) => ({ ...current, specificationsText: event.target.value }))} />
             </div>
 
-            <button className="rounded-full bg-brand px-5 py-3 font-semibold text-navy">
-              {editingProductId ? 'Update Product' : 'Save Product'}
-            </button>
+            <button className="rounded-full bg-brand px-5 py-3 font-semibold text-navy">{editingProductId ? 'Update Product' : 'Save Product'}</button>
           </div>
         </form>
 
         <div className="space-y-8">
           <form onSubmit={handleAnnouncementSubmit} className="rounded-[28px] bg-white p-6 shadow-soft">
             <h2 className="text-xl font-black text-ink">Announcement Banner</h2>
-            <input
-              placeholder="Announcement text"
-              className="mt-4 w-full rounded-2xl border border-slate-200 px-4 py-3"
-              value={announcementText}
-              onChange={(event) => setAnnouncementText(event.target.value)}
-            />
-            <button className="mt-4 rounded-full bg-ink px-5 py-3 font-semibold text-white">
-              Publish Banner
-            </button>
+            <p className="mt-2 text-sm text-slate-500">Paste the full scrolling text exactly as you want it to run in the top header bar.</p>
+            <input placeholder="MEGA SALE: Flat 15% OFF on ALL Products! | Hurry! Limited Time Offer Apply HEATWAVE10 and grab your discount before it is gone! | Offer ends 15 July 2026" className="mt-4 w-full rounded-2xl border border-slate-200 px-4 py-3" value={announcementText} onChange={(event) => setAnnouncementText(event.target.value)} />
+            <button className="mt-4 rounded-full bg-ink px-5 py-3 font-semibold text-white">Publish Banner</button>
             <div className="mt-4 space-y-2">
               {dashboard.announcements.map((announcement) => (
                 <div key={announcement.id} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm">
                   <span className="pr-3 text-slate-600">{announcement.text}</span>
-                  <button type="button" onClick={() => toggleAnnouncement(announcement)} className="rounded-full border border-slate-200 px-3 py-1.5 font-semibold">
-                    {announcement.active ? 'Disable' : 'Enable'}
-                  </button>
+                  <button type="button" onClick={() => toggleAnnouncement(announcement)} className="rounded-full border border-slate-200 px-3 py-1.5 font-semibold">{announcement.active ? 'Disable' : 'Enable'}</button>
                 </div>
               ))}
             </div>
@@ -447,32 +489,15 @@ export function AdminDashboard() {
           <form onSubmit={handleCouponSubmit} className="rounded-[28px] bg-white p-6 shadow-soft">
             <h2 className="text-xl font-black text-ink">Coupons</h2>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <input
-                placeholder="Code"
-                className="rounded-2xl border border-slate-200 px-4 py-3"
-                value={couponForm.code}
-                onChange={(event) => setCouponForm((current) => ({ ...current, code: event.target.value }))}
-              />
-              <input
-                placeholder="Discount %"
-                type="number"
-                className="rounded-2xl border border-slate-200 px-4 py-3"
-                value={couponForm.discount}
-                onChange={(event) =>
-                  setCouponForm((current) => ({ ...current, discount: event.target.value }))
-                }
-              />
+              <input placeholder="Code" className="rounded-2xl border border-slate-200 px-4 py-3" value={couponForm.code} onChange={(event) => setCouponForm((current) => ({ ...current, code: event.target.value }))} />
+              <input placeholder="Discount %" type="number" className="rounded-2xl border border-slate-200 px-4 py-3" value={couponForm.discount} onChange={(event) => setCouponForm((current) => ({ ...current, discount: event.target.value }))} />
             </div>
-            <button className="mt-4 rounded-full bg-accent px-5 py-3 font-semibold text-white">
-              Save Coupon
-            </button>
+            <button className="mt-4 rounded-full bg-accent px-5 py-3 font-semibold text-white">Save Coupon</button>
             <div className="mt-4 space-y-2">
               {dashboard.coupons.map((coupon) => (
                 <div key={coupon.id} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm">
                   <span className="font-semibold text-ink">{coupon.code} ({coupon.discount}%)</span>
-                  <button type="button" onClick={() => toggleCoupon(coupon)} className="rounded-full border border-slate-200 px-3 py-1.5 font-semibold">
-                    {coupon.active ? 'Disable' : 'Enable'}
-                  </button>
+                  <button type="button" onClick={() => toggleCoupon(coupon)} className="rounded-full border border-slate-200 px-3 py-1.5 font-semibold">{coupon.active ? 'Disable' : 'Enable'}</button>
                 </div>
               ))}
             </div>
@@ -480,9 +505,12 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      <div className="grid gap-8 xl:grid-cols-2">
+      <div className="grid gap-8 xl:grid-cols-[1.2fr,0.8fr]">
         <section className="rounded-[28px] bg-white p-6 shadow-soft">
-          <h2 className="text-xl font-black text-ink">Products</h2>
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-xl font-black text-ink">Products</h2>
+            <button type="button" onClick={() => switchView('sales')} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">See Sales</button>
+          </div>
           <div className="mt-4 space-y-3">
             {dashboard.products.map((product) => (
               <div key={product.id} className="rounded-2xl bg-slate-50 px-4 py-3">
@@ -492,12 +520,8 @@ export function AdminDashboard() {
                     <p className="text-sm text-slate-500">Rs {product.price} - {product.stock} in stock</p>
                   </div>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => editProduct(product)} className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold">
-                      Edit
-                    </button>
-                    <button type="button" onClick={() => deleteProduct(product.id)} className="rounded-full bg-ink px-3 py-1.5 text-xs font-semibold text-white">
-                      Delete
-                    </button>
+                    <button type="button" onClick={() => editProduct(product)} className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold">Edit</button>
+                    <button type="button" onClick={() => deleteProduct(product.id)} className="rounded-full bg-ink px-3 py-1.5 text-xs font-semibold text-white">Delete</button>
                   </div>
                 </div>
               </div>
@@ -506,37 +530,17 @@ export function AdminDashboard() {
         </section>
 
         <section className="rounded-[28px] bg-white p-6 shadow-soft">
-          <h2 className="text-xl font-black text-ink">Orders</h2>
+          <h2 className="text-xl font-black text-ink">Latest Orders</h2>
           <div className="mt-4 space-y-4">
-            {dashboard.orders.map((order) => (
+            {dashboard.orders.slice(0, 6).map((order) => (
               <div key={order.id} className="rounded-2xl bg-slate-50 p-4">
                 <p className="font-semibold text-ink">Order #{order.id}</p>
                 <p className="text-sm text-slate-600">{order.customer_name} - {order.phone}</p>
-                <p className="mt-1 text-sm text-slate-500">{order.address}</p>
+                <p className="mt-1 text-sm text-slate-500">Rs {Math.round(Number(order.total_price || 0))} - {order.status}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <a
-                    href={getOrderWhatsappUrl(order)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-600"
-                  >
-                    <MessageCircle className="h-3.5 w-3.5" />
-                    WhatsApp Update
+                  <a href={getOrderWhatsappUrl(order)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-600">
+                    <MessageCircle className="h-3.5 w-3.5" /> WhatsApp Update
                   </a>
-                  {['Pending', 'Shipped', 'Delivered'].map((status) => (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() => updateOrderStatus(order.id, status)}
-                      className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                        order.status === status
-                          ? 'bg-brand text-navy'
-                          : 'border border-slate-200 bg-white text-slate-600'
-                      }`}
-                    >
-                      {status}
-                    </button>
-                  ))}
                 </div>
               </div>
             ))}
