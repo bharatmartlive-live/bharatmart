@@ -57,13 +57,13 @@ ON DUPLICATE KEY UPDATE slug = slug;
 
 INSERT INTO coupons (code, discount, active)
 VALUES
-  ('HEATWAVE10', 10, TRUE),
-  ('SUMMER20', 20, TRUE)
+  ('SUMMER10', 10, TRUE),
+  ('HEATWAVE10', 10, TRUE)
 ON DUPLICATE KEY UPDATE code = code;
 
 INSERT INTO announcements (text, active)
 VALUES
-  ('SUMMER FLASH: Up to 55% off cooling essentials', TRUE),
-  ('Use code HEATWAVE10 for extra savings', TRUE),
+  ('SUMMER SALE: Flat 10% OFF on ALL Products! | Use code SUMMER10 and save more before checkout | Offer ends 15 June', TRUE),
+  ('Extra 5% off on all online payments powered by Razorpay', TRUE),
   ('Free shipping on orders above Rs 999', TRUE)
 ON DUPLICATE KEY UPDATE text = text;

@@ -20,6 +20,8 @@ export const env = {
   mysqlUser: process.env.MYSQL_USER,
   mysqlPassword: process.env.MYSQL_PASSWORD,
   mysqlDb: process.env.MYSQL_DB,
+  razorpayKeyId: process.env.RAZORPAY_KEY_ID || '',
+  razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET || '',
   keepAliveUrl: process.env.KEEP_ALIVE_URL || '',
   enableKeepAlive: process.env.ENABLE_KEEP_ALIVE === 'true'
 };

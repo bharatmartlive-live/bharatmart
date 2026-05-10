@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # BharatMart.live
 
 Production-minded full-stack ecommerce starter for `bharatmart.live` with:
@@ -8,6 +7,7 @@ Production-minded full-stack ecommerce starter for `bharatmart.live` with:
 - MySQL database
 - JWT-based admin authentication
 - Media upload support with `multer`
+- Razorpay checkout support for online payments
 
 ## Project Structure
 
@@ -50,14 +50,33 @@ Frontend runs on `http://localhost:5173` and backend on `http://localhost:5000`.
 
 ## Environment Variables
 
-Use the MySQL credentials you shared inside `backend/.env`.
+Add these to `backend/.env` or your Render backend environment:
+
+```text
+PORT=5000
+CLIENT_URL=https://bharatmart.live
+JWT_SECRET=change_me_to_a_long_random_secret
+MYSQL_HOST=...
+MYSQL_USER=...
+MYSQL_PASSWORD=...
+MYSQL_DB=...
+RAZORPAY_KEY_ID=your_key_id
+RAZORPAY_KEY_SECRET=your_secret_key
+```
+
+For the publish frontend, add this to your Netlify or Render frontend environment:
+
+```text
+VITE_API_URL=https://your-backend.onrender.com/api
+VITE_MEDIA_URL=https://your-backend.onrender.com
+```
 
 ## Highlights
 
 - Sticky, conversion-focused storefront with announcement bar and responsive sections
-- Product detail page with gallery and video support
-- Cart and checkout flow with persisted local cart state
-- Admin dashboard for products, coupons, announcements, and orders
+- Product detail page with gallery, video support, reviews, FAQ, and testimonial system
+- Cart and checkout flow with coupon support, COD, and Razorpay online payment
+- Admin dashboard for products, coupons, announcements, analytics, and order management
 - Secure admin routes with JWT middleware
 - REST API under `/api/products`, `/api/orders`, `/api/users`, `/api/admin`
 
@@ -65,7 +84,4 @@ Use the MySQL credentials you shared inside `backend/.env`.
 
 - Media uploads are stored in `backend/uploads` and exposed via `/uploads/...`.
 - The logo asset is recreated as an SVG inspired by your provided branding so it can scale cleanly across the site.
-=======
-# bharatmart
-None
->>>>>>> 986813a12ea37ff9bd0882d311e069c5acc0d620
+- If you pasted a live Razorpay secret anywhere public, rotate that secret in the Razorpay dashboard before production use.

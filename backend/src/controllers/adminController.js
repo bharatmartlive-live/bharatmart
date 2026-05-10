@@ -1,4 +1,5 @@
 import { pool } from '../config/db.js';
+import { storeCampaign } from '../config/storeCampaign.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { getAnalyticsSummary } from '../services/analyticsService.js';
 import { createProduct, updateProduct } from '../services/productService.js';
@@ -11,10 +12,35 @@ export const storefrontData = asyncHandler(async (req, res) => {
     'SELECT id, code, discount, active FROM coupons WHERE active = true ORDER BY created_at DESC'
   );
 
+  const mergedAnnouncements = [
+    { id: 'default-summer-sale', text: storeCampaign.announcementText, active: true },
+    ...announcements
+  ].filter(
+    (announcement, index, list) =>
+      list.findIndex(
+        (entry) => String(entry.text).trim().toLowerCase() === String(announcement.text).trim().toLowerCase()
+      ) === index
+  );
+
+  const mergedCoupons = [
+    {
+      id: 'default-summer10',
+      code: storeCampaign.couponCode,
+      discount: storeCampaign.couponDiscount,
+      active: true
+    },
+    ...coupons
+  ].filter(
+    (coupon, index, list) =>
+      list.findIndex((entry) => String(entry.code).trim().toUpperCase() === String(coupon.code).trim().toUpperCase()) ===
+      index
+  );
+
   res.json({
     data: {
-      announcements,
-      coupons
+      announcements: mergedAnnouncements,
+      coupons: mergedCoupons,
+      campaign: storeCampaign
     }
   });
 });

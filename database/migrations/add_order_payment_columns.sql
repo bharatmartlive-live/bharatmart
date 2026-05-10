@@ -1,0 +1,15 @@
+ALTER TABLE orders
+  ADD COLUMN billing_address TEXT NULL,
+  ADD COLUMN shipping_address TEXT NULL,
+  ADD COLUMN note TEXT NULL,
+  ADD COLUMN monthly_offers BOOLEAN DEFAULT FALSE,
+  ADD COLUMN original_total DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  ADD COLUMN subtotal_price DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  ADD COLUMN coupon_code VARCHAR(80) NULL,
+  ADD COLUMN coupon_discount DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  ADD COLUMN online_discount DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  ADD COLUMN payment_method VARCHAR(30) NOT NULL DEFAULT 'COD',
+  ADD COLUMN payment_status VARCHAR(30) NOT NULL DEFAULT 'Pending',
+  ADD COLUMN payment_provider VARCHAR(40) NULL,
+  ADD COLUMN razorpay_order_id VARCHAR(120) NULL,
+  ADD COLUMN razorpay_payment_id VARCHAR(120) NULL;
